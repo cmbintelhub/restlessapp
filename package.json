@@ -1,0 +1,32 @@
+{
+  "name": "restless",
+  "version": "1.0.0",
+  "description": "Protótipo de app de redução de desperdício alimentar",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "npm run test:unit && node tests/ui.mjs && node tests/scan.mjs",
+    "test:unit": "node tests/run.mjs && node tests/nfce.mjs && node tests/chatbot.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "autoprefixer": "^10.6.0",
+    "jsqr": "^1.4.0",
+    "leaflet": "^1.9.4",
+    "postcss": "^8.5.28",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^3.4.19",
+    "tesseract.js": "^7.0.0",
+    "vite": "^8.3.0"
+  },
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
