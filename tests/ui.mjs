@@ -55,7 +55,38 @@ await page.getByRole('button', { name: /^Next$/ }).click()
 await shot('04-onb-list')
 await page.getByRole('button', { name: /Open restless/i }).click()
 await page.waitForTimeout(400)
-await shot('05-home')
+check('the guided tour opens right after onboarding', await page.getByText('Quick look around').count() === 1)
+await shot('05-tour-intro')
+
+await page.getByRole('button', { name: /Let's go/ }).click()
+await page.waitForTimeout(300)
+check('the tour jumps straight into the first pillar screen',
+  await page.getByRole('button', { name: /^Planner$/ }).getAttribute('aria-current') === 'page')
+await shot('05a-tour-planner')
+
+for (let i = 0; i < 4; i++) {
+  await page.getByRole('button', { name: /^Next$/ }).click()
+  await page.waitForTimeout(250)
+}
+check('the tour walks the pillars in ranked order and ends on Account',
+  await page.getByRole('button', { name: /^Account$/ }).getAttribute('aria-current') === 'page')
+await shot('05b-tour-impact')
+
+await page.getByRole('button', { name: /^Next$/ }).click()
+await page.waitForTimeout(250)
+check('the tour then points at the assistant icon', await page.getByText('Stuck? Just ask').count() === 1)
+check('the assistant icon is reachable while the tour points at it',
+  await page.getByRole('button', { name: /Open the assistant/i }).isVisible())
+await shot('05b2-tour-chatbot')
+
+await page.getByRole('button', { name: /^Next$/ }).click()
+await page.waitForTimeout(250)
+check('the tour closes with a summary card', await page.getByText('All set').count() === 1)
+await page.getByRole('button', { name: /^Done$/ }).click()
+await page.waitForTimeout(300)
+check('finishing the tour lands back on Home',
+  await page.getByRole('button', { name: /^Today$/ }).getAttribute('aria-current') === 'page')
+await shot('05c-home')
 
 await page.getByRole('button', { name: /^Planner$/ }).click()
 await shot('06-planner-list')
@@ -125,11 +156,44 @@ await page.locator('main button').filter({ hasText: /^Claim$/ }).first().click()
 await page.waitForTimeout(400)
 await shot('17-claimed')
 
-await page.getByRole('button', { name: /^Impact$/ }).click()
+// Co-creation: neighborhood tips board — seeded neighbor tips, posting your own, liking one.
+const tipsList = page.locator('[data-tour-el="comm-tips"] li')
+check('the tips board starts with neighbor-submitted tips',
+  await page.locator('main').getByText('Neighborhood tips').count() === 1)
+const tipCountBefore = await tipsList.count()
+await page.locator('main textarea').fill('Keep basil in a glass of water on the counter, not the fridge.')
+await page.getByRole('button', { name: 'Post tip' }).click()
+await page.waitForTimeout(250)
+check('posting a tip adds it to the top of the board',
+  (await tipsList.first().innerText()).includes('Keep basil in a glass of water'))
+check('the board grew by exactly one tip', await tipsList.count() === tipCountBefore + 1)
+const firstLikeBtn = tipsList.first().locator('button')
+const likesBefore = parseInt(await firstLikeBtn.innerText(), 10)
+await firstLikeBtn.click()
+await page.waitForTimeout(200)
+check('liking a tip increments its count', parseInt(await firstLikeBtn.innerText(), 10) === likesBefore + 1)
+await shot('16b-community-tips')
+
+await page.getByRole('button', { name: /^Account$/ }).click()
 await page.waitForTimeout(250)
 const kgText = await page.locator('main .num').first().innerText()
 check('impact shows a non-zero total', parseFloat(kgText.replace(',', '.')) > 0, kgText)
+check('the Account tab defaults to the customer-facing "My progress" view, no CSM jargon',
+  !(await page.locator('main').innerText()).includes('Customer Health Score'))
 await shot('18-impact')
+
+// Account is split into a customer view and a separate, clearly-labelled internal
+// "Account Insights" view for the company/CS side — Health Score, churn risk, CSQL,
+// DAU/WAU/MAU benchmarks and the rest of the CSM metrics live only behind that toggle.
+await page.getByRole('button', { name: /Account Insights/ }).click()
+await page.waitForTimeout(250)
+check('switching to Account Insights reveals the Customer Health Score',
+  (await page.locator('main').innerText()).includes('Customer Health Score'))
+await shot('18d-account-insights')
+await page.getByRole('button', { name: /^My progress$/ }).click()
+await page.waitForTimeout(250)
+check('switching back to "My progress" hides the Account Insights content again',
+  !(await page.locator('main').innerText()).includes('Customer Health Score'))
 
 // Assistente: ícone no topo, sugestões, resposta contextual e transferência para atendente
 await page.locator('header button[aria-label="Open the assistant"]').click()
@@ -143,7 +207,7 @@ await dlg.locator('[data-chips] button').filter({ hasText: 'How much have I save
 await page.waitForTimeout(1000)
 const botAfterChip = await dlg.locator('p[data-from="bot"]').last().innerText()
 check('a suggestion chip gets an answer', /kept .* kg/.test(botAfterChip), botAfterChip)
-check('the contextual answer matches the Impact tab', botAfterChip.includes(kgText.trim()), `${kgText} | ${botAfterChip}`)
+check('the contextual answer matches the Account tab', botAfterChip.includes(kgText.trim()), `${kgText} | ${botAfterChip}`)
 await dlg.getByRole('textbox').fill('any discounts nearby?')
 await dlg.getByRole('button', { name: 'Send' }).click()
 await page.waitForTimeout(1000)
@@ -158,6 +222,30 @@ check('the input is hidden while handed off', await dlg.getByRole('textbox').cou
 await page.waitForTimeout(1600)
 check('the handoff reaches the queue', await dlg.locator('[data-handoff="queue"]').count() === 1)
 await shot('18c-chat-handoff')
+
+// Co-creation aimed at the app itself: a "Feature ideas" tab next to the AI assistant,
+// reachable even mid human-handoff, where restless users suggest and vote on features.
+await dlg.getByRole('button', { name: 'Feature ideas' }).click()
+await page.waitForTimeout(250)
+const ideaList = dlg.locator('[data-tour-el="idea-board"] li')
+const ideaCountBefore = await ideaList.count()
+check('the idea board starts seeded with other users\' suggestions', ideaCountBefore > 0)
+await dlg.locator('textarea').fill('Dark mode for the whole app.')
+await dlg.getByRole('button', { name: 'Post idea' }).click()
+await page.waitForTimeout(250)
+check('the idea board grew by exactly one', await ideaList.count() === ideaCountBefore + 1)
+check('the new idea is somewhere on the board',
+  (await dlg.locator('[data-tour-el="idea-board"]').innerText()).includes('Dark mode for the whole app.'))
+const firstVoteBtn = ideaList.first().locator('button')
+const votesBefore = parseInt(await firstVoteBtn.locator('.num').innerText(), 10)
+await firstVoteBtn.click()
+await page.waitForTimeout(200)
+check('voting for an idea increments its count', parseInt(await firstVoteBtn.locator('.num').innerText(), 10) === votesBefore + 1)
+await shot('18d-chat-ideas')
+await dlg.getByRole('button', { name: 'Assistant' }).click()
+await page.waitForTimeout(250)
+check('switching back to Assistant keeps the handoff queue state',
+  await dlg.locator('[data-handoff="queue"]').count() === 1)
 await dlg.getByRole('button', { name: 'Back to the assistant' }).click()
 await page.waitForTimeout(200)
 check('going back restores the input', await dlg.getByRole('textbox').count() === 1)
@@ -183,6 +271,11 @@ await shot('20-home-after-3-days')
 // settings + language toggle
 await page.locator('header button[aria-label="Settings"]').click()
 await page.waitForTimeout(350)
+check('the account team contact card names the Customer Success Manager',
+  await page.locator('[role="dialog"]').getByText('Malkam Goytom').count() === 1)
+check('the contact card gives an email and a phone number',
+  await page.locator('[role="dialog"] a[href="mailto:halbermann@restless.com"]').count() === 1 &&
+  await page.locator('[role="dialog"] a[href="tel:+5511926451819"]').count() === 1)
 await shot('21-settings')
 await page.locator('[role="dialog"] button').filter({ hasText: /Português/ }).click()
 await page.waitForTimeout(350)
@@ -235,7 +328,7 @@ shots.push(`${SHOTS}/25-desktop.png`)
   check('a página não oferece mais APK', !/\.apk|APK/.test(html))
   check('a página cobre iPhone', /Adicionar à Tela de Início/.test(html))
   check('a página cobre Android pelo Chrome', /Instalar/.test(html) && /Adicionar à tela inicial/.test(html))
-  check('a página mostra o endereço do GitHub Pages', html.includes('cmbintelhub.github.io/restlessapp'))
+  check('a página mostra o endereço do GitHub Pages', html.includes('valentinpvlc-blip.github.io/CSMAPP'))
   check('nenhuma menção ao Netlify na página', !/netlify/i.test(html))
 
   // O QR é decodificado de verdade: rasteriza o SVG e lê com jsQR.
@@ -247,7 +340,7 @@ shots.push(`${SHOTS}/25-desktop.png`)
     const { data, info } = await sharp(Buffer.from(svg)).resize(520, 520).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
     const code = jsQR(new Uint8ClampedArray(data), info.width, info.height)
     check('o QR aponta para a página de instalação no GitHub Pages',
-      code?.data === 'https://cmbintelhub.github.io/restlessapp/baixar/', code?.data)
+      code?.data === 'https://valentinpvlc-blip.github.io/CSMAPP/baixar/', code?.data)
   }
 
   // Varre o build inteiro, binários incluídos, atrás de qualquer resto do deploy antigo.
@@ -274,7 +367,7 @@ shots.push(`${SHOTS}/25-desktop.png`)
   check('o index traz as metatags de app do iOS',
     await wide.locator('meta[name="apple-mobile-web-app-capable"]').count() === 1)
   check('o preview social usa URL absoluta do GitHub Pages',
-    (await wide.locator('meta[property="og:image"]').getAttribute('content')) === 'https://cmbintelhub.github.io/restlessapp/preview.png')
+    (await wide.locator('meta[property="og:image"]').getAttribute('content')) === 'https://valentinpvlc-blip.github.io/CSMAPP/preview.png')
   const swReady = await wide.evaluate(async () => {
     const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((r) => setTimeout(() => r(null), 4000))])
     return reg ? reg.scope : null

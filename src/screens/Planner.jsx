@@ -192,7 +192,7 @@ export default function Planner({ go }) {
     <div className="px-5 pt-5 pb-8">
       <h1 className="font-display text-[25px] leading-tight tracking-tight mb-4">{t('planner.title')}</h1>
 
-      <div className="flex gap-1 p-1 bg-bark border border-fern/40 rounded-full mb-5">
+      <div className="flex gap-1 p-1 bg-bark border border-fern/40 rounded-full mb-5" data-tour-el="planner-tabs">
         {[['list', t('planner.tab.list')], ['pantry', t('planner.tab.pantry')]].map(([k, label]) => (
           <button
             key={k}
@@ -206,7 +206,7 @@ export default function Planner({ go }) {
 
       {tab === 'list' && (
         <>
-          <div className="flex gap-2.5 mb-4">
+          <div className="flex gap-2.5 mb-4" data-tour-el="planner-actions">
             <button className="btn-primary flex-1 py-2.5 text-[14px]" onClick={() => setAddOpen(true)}>
               {t('planner.addItem')}
             </button>

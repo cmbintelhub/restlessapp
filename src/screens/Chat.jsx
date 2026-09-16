@@ -1,8 +1,72 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useApp } from '../store.jsx'
-import { Sheet, Icon, Chip } from '../components/ui.jsx'
+import { Sheet, Icon, Chip, Empty } from '../components/ui.jsx'
 import { reply, INTENTS, STARTERS } from '../lib/chatbot.js'
 import { translate } from '../lib/i18n.js'
+import { NEIGHBORS } from '../data/seed.js'
+import { daysBetween, relativeWhen } from '../lib/logic.js'
+
+const neighborById = (id) => NEIGHBORS.find((n) => n.id === id)
+
+/** Feature-idea board living inside the assistant sheet: co-creation aimed at the
+ * app itself instead of the AI chatbot — restless users suggesting and voting on
+ * what to build next, real local state, no backend needed. */
+function IdeaBoard() {
+  const { state, dispatch, t } = useApp()
+  const [text, setText] = useState('')
+  const ideas = [...state.ideas].sort((a, b) => b.votes - a.votes || new Date(b.postedOn) - new Date(a.postedOn))
+
+  return (
+    <div className="min-h-[46vh] flex flex-col">
+      <p className="text-[13px] text-haze mb-4">{t('ideas.subtitle')}</p>
+      <div className="card px-4 py-4 mb-3">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={t('ideas.placeholder')}
+          rows={2}
+          className="w-full bg-transparent text-[14px] placeholder:text-haze/70 resize-none outline-none"
+        />
+        <button
+          className="btn-primary w-full mt-2.5 py-2.5 text-[13.5px] disabled:opacity-35"
+          disabled={!text.trim()}
+          onClick={() => { dispatch({ type: 'addIdea', text }); setText('') }}
+        >
+          {t('ideas.submit')}
+        </button>
+      </div>
+
+      {ideas.length === 0 ? (
+        <Empty>{t('ideas.empty')}</Empty>
+      ) : (
+        <ul className="space-y-2.5" data-tour-el="idea-board">
+          {ideas.map((it) => {
+            const n = it.mine ? null : neighborById(it.neighbor)
+            const who = it.mine ? t('ideas.mine') : (n?.name || '')
+            const ago = daysBetween(state.clock, it.postedOn)
+            return (
+              <li key={it.id} className="card px-4 py-3.5 flex items-start gap-3">
+                <button
+                  className={`flex flex-col items-center gap-0.5 shrink-0 w-11 py-1.5 rounded-xl border ${
+                    it.votedByMe ? 'border-sage text-sage bg-sage/10' : 'border-fern/50 text-haze'
+                  }`}
+                  onClick={() => dispatch({ type: 'voteIdea', id: it.id })}
+                >
+                  <Icon.arrowUp size={15} />
+                  <span className="num text-[12.5px]">{it.votes}</span>
+                </button>
+                <div className="min-w-0">
+                  <p className="text-[14px] leading-snug">{it.text}</p>
+                  <p className="text-[12px] text-haze mt-1">{who} · {relativeWhen(ago, t)}</p>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 const TYPING_MS = 650
 const CONNECT_MS = 1400
@@ -58,6 +122,7 @@ function Handoff({ msg }) {
 export default function Chat({ open, onClose, messages, setMessages }) {
   const { state, t } = useApp()
   const lang = state.lang
+  const [view, setView] = useState('assistant')
   const [draft, setDraft] = useState('')
   const [typing, setTyping] = useState(false)
   const [handedOff, setHandedOff] = useState(false)
@@ -71,7 +136,7 @@ export default function Chat({ open, onClose, messages, setMessages }) {
   useEffect(() => {
     const el = bodyRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [messages, typing, open])
+  }, [messages, typing, open, view])
 
   const later = (fn, ms) => timers.current.push(setTimeout(fn, ms))
 
@@ -153,27 +218,42 @@ export default function Chat({ open, onClose, messages, setMessages }) {
     </>
   )
 
+  const tabs = (
+    <div className="flex gap-1 p-1 bg-bark border border-fern/40 rounded-full">
+      {[['assistant', t('chat.tab.assistant')], ['ideas', t('chat.tab.ideas')]].map(([k, label]) => (
+        <button key={k} onClick={() => setView(k)}
+          className={`flex-1 rounded-full py-1.5 text-[13px] font-semibold transition-colors ${view === k ? 'bg-sage text-ink' : 'text-haze'}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
-    <Sheet open={open} onClose={onClose} title={t('chat.title')} tall footer={footer} bodyRef={bodyRef}>
-      <div className="min-h-[46vh] flex flex-col">
-        <div className="flex-1" />
-        <div className="space-y-2.5 pt-1" aria-live="polite">
-          <Bubble msg={{ from: 'bot', text: t('chat.intro') }} />
-          {messages.map((m) => (m.from === 'system' ? <Handoff key={m.id} msg={m} /> : <Bubble key={m.id} msg={m} />))}
-          {typing && (
-            <div className="flex justify-start" aria-label={t('chat.typing')}>
-              <span className="bg-bark border border-fern/40 rounded-2xl rounded-bl-md px-3.5 py-3 inline-flex gap-1">
-                <span className="chat-dot" /><span className="chat-dot" /><span className="chat-dot" />
-              </span>
-            </div>
+    <Sheet open={open} onClose={onClose} title={t('chat.title')} tall tabs={tabs} footer={view === 'assistant' ? footer : null} bodyRef={bodyRef}>
+      {view === 'ideas' ? (
+        <IdeaBoard />
+      ) : (
+        <div className="min-h-[46vh] flex flex-col">
+          <div className="flex-1" />
+          <div className="space-y-2.5 pt-1" aria-live="polite">
+            <Bubble msg={{ from: 'bot', text: t('chat.intro') }} />
+            {messages.map((m) => (m.from === 'system' ? <Handoff key={m.id} msg={m} /> : <Bubble key={m.id} msg={m} />))}
+            {typing && (
+              <div className="flex justify-start" aria-label={t('chat.typing')}>
+                <span className="bg-bark border border-fern/40 rounded-2xl rounded-bl-md px-3.5 py-3 inline-flex gap-1">
+                  <span className="chat-dot" /><span className="chat-dot" /><span className="chat-dot" />
+                </span>
+              </div>
+            )}
+          </div>
+          {messages.length > 0 && (
+            <button onClick={clear} className="self-center mt-4 text-[12.5px] text-haze underline underline-offset-2">
+              {t('chat.clear')}
+            </button>
           )}
         </div>
-        {messages.length > 0 && (
-          <button onClick={clear} className="self-center mt-4 text-[12.5px] text-haze underline underline-offset-2">
-            {t('chat.clear')}
-          </button>
-        )}
-      </div>
+      )}
     </Sheet>
   )
 }

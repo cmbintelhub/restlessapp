@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "npm run test:unit && node tests/ui.mjs && node tests/scan.mjs",
-    "test:unit": "node tests/run.mjs && node tests/nfce.mjs && node tests/chatbot.mjs"
+    "test:unit": "node tests/run.mjs && node tests/nfce.mjs && node tests/chatbot.mjs && node tests/metrics.mjs"
   },
   "keywords": [],
   "author": "",

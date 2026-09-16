@@ -181,8 +181,8 @@ export const INTENTS = [
           "You haven't logged any impact yet. Reserving a deal, claiming a neighbor post or cutting a quantity on your list all start the count.")
       }
       return L(lang,
-        `Até agora você tirou ${f.kgText} kg de comida do lixo e economizou ${f.money}. Você tem ${f.points} pontos; a cada 100 dá para trocar por R$ 5 de crédito na aba Impacto.`,
-        `So far you've kept ${f.kgText} kg of food out of the bin and saved ${f.money}. You have ${f.points} points; every 100 can be swapped for R$ 5 of credit on the Impact tab.`)
+        `Até agora você tirou ${f.kgText} kg de comida do lixo e economizou ${f.money}. Você tem ${f.points} pontos; a cada 100 dá para trocar por R$ 5 de crédito na aba Conta.`,
+        `So far you've kept ${f.kgText} kg of food out of the bin and saved ${f.money}. You have ${f.points} points; every 100 can be swapped for R$ 5 of credit on the Account tab.`)
     },
     next: ['deals', 'neighbors'],
   },
@@ -349,8 +349,8 @@ export const INTENTS = [
       en: ['how does it work', 'how does restless work', 'how it works', 'restless', 'app', 'pillars', 'what is this', 'help'],
     },
     answer: {
-      pt: 'O restless ataca o desperdício em quatro frentes: uma lista que conhece a sua despensa, a quantidade certa para a sua casa, ofertas de comida perto da data no Radar e doação entre vizinhos. Tudo soma no mesmo número da aba Impacto.',
-      en: 'restless tackles waste on four fronts: a list that knows your pantry, the right amount for your household, markdowns on food near its date on the Radar, and sharing with neighbors. It all adds up to one number on the Impact tab.',
+      pt: 'O restless ataca o desperdício em quatro frentes: uma lista que conhece a sua despensa, a quantidade certa para a sua casa, ofertas de comida perto da data no Radar e doação entre vizinhos. Tudo soma no mesmo número da aba Conta.',
+      en: 'restless tackles waste on four fronts: a list that knows your pantry, the right amount for your household, markdowns on food near its date on the Radar, and sharing with neighbors. It all adds up to one number on the Account tab.',
     },
     next: ['expiring', 'deals', 'impact'],
   },

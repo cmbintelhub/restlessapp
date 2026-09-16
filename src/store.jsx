@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
 import {
-  CATALOG, DEALS, EXTRA_DEALS, COMMUNITY_SEED, RECEIPTS, NEIGHBORS, PILLARS, byId, storeById,
+  CATALOG, DEALS, EXTRA_DEALS, COMMUNITY_SEED, TIP_SEED, IDEA_SEED, RECEIPTS, NEIGHBORS, PILLARS, byId, storeById,
 } from './data/seed.js'
 import { addDays, iso, daysBetween, kgOf, pointsFor, suggestQuantity, weeklyNeed, newPerson } from './lib/logic.js'
 import { translate } from './lib/i18n.js'
 
 const KEY = 'restless.state.v1'
-const VERSION = 3
+const VERSION = 6
 
 let seq = 1
 const uid = (p = 'i') => `${p}${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -17,6 +17,7 @@ export function initialState() {
     v: VERSION,
     lang: 'en',
     onboarded: false,
+    onboardedAt: null,
     clock: today,
     household: { people: [newPerson('adult'), newPerson('adult')], diets: [], cpf: true },
     prefs: {
@@ -45,11 +46,35 @@ export function initialState() {
       expiry: iso(addDays(today, c.expiresIn)),
       status: 'open',
     })),
+    // Co-creation: neighbor-submitted tips, plus whatever this household adds itself.
+    tips: TIP_SEED.map((tp) => ({
+      ...tp,
+      mine: false,
+      postedOn: iso(addDays(today, -tp.postedAgo)),
+      likedByMe: false,
+    })),
+    // Co-creation aimed at the app itself: a feature-idea board inside the assistant.
+    ideas: IDEA_SEED.map((it) => ({
+      ...it,
+      mine: false,
+      postedOn: iso(addDays(today, -it.postedAgo)),
+      votedByMe: false,
+    })),
     impact: { kg: 0, money: 0, points: 0, credit: 0, events: [] },
     notifications: [],
     stats: { dealsViewed: 0, dealsReserved: 0, pillarsUsed: [] },
     extraDealPool: EXTRA_DEALS.map((d) => d.id),
     learnedEans: {},
+    // Real, per-household usage history — kept in the same clock the rest of the
+    // prototype already fakes time with, so "Advance 3 days" in Demo controls moves
+    // streaks/adoption forward exactly like it moves pantry freshness forward.
+    usage: {
+      sessions: 0,
+      activeDates: [],
+      firstValueAt: null,
+      pillarFirstUsedAt: { planner: null, radar: null, quantity: null, community: null },
+    },
+    nps: null, // { score: 0-10, ts } once this household answers the in-app pulse
     toast: null,
   }
 }
@@ -98,7 +123,7 @@ function receiptToPantry(state, receipt) {
   return items
 }
 
-export function reducer(state, action) {
+function reducerBase(state, action) {
   switch (action.type) {
     case 'lang':
       return { ...state, lang: action.lang }
@@ -251,6 +276,45 @@ export function reducer(state, action) {
       return s
     }
 
+    case 'addTip': {
+      const text = (action.text || '').trim()
+      if (!text) return state
+      const tip = {
+        id: uid('tip'), pillar: action.pillar || null, text, likes: 0,
+        postedOn: state.clock, mine: true, likedByMe: false,
+      }
+      return {
+        ...state,
+        tips: [tip, ...state.tips],
+        stats: { ...state.stats, pillarsUsed: usePillar(state, 'community') },
+      }
+    }
+
+    case 'likeTip': {
+      return {
+        ...state,
+        tips: state.tips.map((tp) => (tp.id === action.id
+          ? { ...tp, likedByMe: !tp.likedByMe, likes: tp.likes + (tp.likedByMe ? -1 : 1) }
+          : tp)),
+      }
+    }
+
+    case 'addIdea': {
+      const text = (action.text || '').trim()
+      if (!text) return state
+      const idea = { id: uid('idea'), text, votes: 0, postedOn: state.clock, mine: true, votedByMe: false }
+      return { ...state, ideas: [idea, ...state.ideas] }
+    }
+
+    case 'voteIdea': {
+      return {
+        ...state,
+        ideas: state.ideas.map((it) => (it.id === action.id
+          ? { ...it, votedByMe: !it.votedByMe, votes: it.votes + (it.votedByMe ? -1 : 1) }
+          : it)),
+      }
+    }
+
     case 'neighborClaims': {
       const mine = state.community.find((c) => c.owner === 'me' && c.status === 'open')
       if (!mine) return state
@@ -382,6 +446,13 @@ export function reducer(state, action) {
     case 'readNotifications':
       return { ...state, notifications: state.notifications.map((n) => ({ ...n, read: true })) }
 
+    case 'session':
+      // Dispatched once whenever the app mounts: a real, if coarse, "app opened" count.
+      return { ...state, usage: { ...state.usage, sessions: state.usage.sessions + 1 } }
+
+    case 'submitNps':
+      return { ...state, nps: { score: action.score, ts: state.clock } }
+
     case 'reset':
       return { ...initialState(), lang: state.lang }
 
@@ -393,11 +464,64 @@ export function reducer(state, action) {
   }
 }
 
+/**
+ * Runs after every action to keep the real, per-household usage history current:
+ * when onboarding finished, the first time any kg/money got saved, the first time
+ * each pillar got used, and which of the app's own clock-days had real activity on
+ * them. Centralized here so individual action handlers above don't each need to
+ * remember to update it. `usage` is what the Account tab's health score, streak,
+ * time-to-first-value and feature-adoption metrics are computed from.
+ */
+function trackUsage(prev, next, action) {
+  if (action.type === 'hydrate' || action.type === 'reset' || prev === next) return next
+
+  let usage = next.usage
+  let onboardedAt = next.onboardedAt
+
+  if (!prev.onboarded && next.onboarded) onboardedAt = next.clock
+
+  const PASSIVE = ['session', 'lang', 'prefs', 'toast', 'readNotifications']
+  if (next.onboarded && !PASSIVE.includes(action.type) && !usage.activeDates.includes(next.clock)) {
+    usage = { ...usage, activeDates: [...usage.activeDates, next.clock].slice(-180) }
+  }
+
+  if (!usage.firstValueAt && prev.impact.kg === 0 && next.impact.kg > 0) {
+    usage = { ...usage, firstValueAt: next.clock }
+  }
+
+  const prevPillars = prev.stats?.pillarsUsed || []
+  const nextPillars = next.stats?.pillarsUsed || []
+  if (nextPillars.length > prevPillars.length) {
+    const added = nextPillars.filter((p) => !prevPillars.includes(p))
+    const stamped = { ...usage.pillarFirstUsedAt }
+    let changed = false
+    for (const p of added) if (!stamped[p]) { stamped[p] = next.clock; changed = true }
+    if (changed) usage = { ...usage, pillarFirstUsedAt: stamped }
+  }
+
+  if (usage === next.usage && onboardedAt === next.onboardedAt) return next
+  return { ...next, usage, onboardedAt }
+}
+
+export function reducer(state, action) {
+  const next = reducerBase(state, action)
+  return trackUsage(state, next, action)
+}
+
 const Ctx = createContext(null)
 
 /** v1 stored a household as counts plus one shared appetite; v2 stores a person per mouth. */
 function migrate(state) {
   if (state.v === VERSION) return state
+  // v5 -> v6 only added the in-app feature-idea board; load() backfills the seeded
+  // ideas list from initialState() since it's missing here, same trick as v3 -> v4.
+  if (state.v === 5) return { ...state, v: VERSION }
+  // v4 -> v5 only added the co-creation tips board; load() backfills the seeded
+  // tips list from initialState() since it's missing here, same trick as v3 -> v4.
+  if (state.v === 4) return { ...state, v: VERSION }
+  // v3 -> v4 only added usage/onboardedAt/nps tracking; load() backfills any field
+  // missing here from initialState(), so bumping the version number is all that's needed.
+  if (state.v === 3) return { ...state, v: VERSION }
   if (state.v === 2) return { ...state, v: VERSION, learnedEans: state.learnedEans || {} }
   if (state.v === 1) {
     const h = state.household || {}

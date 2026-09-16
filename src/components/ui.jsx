@@ -29,6 +29,8 @@ export const Icon = {
   flask: (p) => <S {...p}><path d="M10 3v6.5L4.8 18A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-3L14 9.5V3" /><path d="M9 3h6M7.5 15h9" /></S>,
   clock: (p) => <S {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></S>,
   gift: (p) => <S {...p}><path d="M4 11h16v9H4z" /><path d="M2.5 7.5h19V11h-19z" /><path d="M12 7.5V20" /><path d="M12 7.5S10.5 3.5 8.2 4.3C6.4 4.9 7 7.5 12 7.5Zm0 0s1.5-4 3.8-3.2c1.8.6 1.2 3.2-3.8 3.2Z" /></S>,
+  heart: (p) => <S {...p}><path d="M12 20s-7-4.6-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.4-9.5 9-9.5 9Z" /></S>,
+  arrowUp: (p) => <S {...p}><path d="M12 19V6M6 11l6-6 6 6" /></S>,
   trash: (p) => <S {...p}><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" /></S>,
   share: (p) => <S {...p}><circle cx="17" cy="6" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="17" cy="18" r="2.5" /><path d="m8.3 10.8 6.4-3.4M8.3 13.2l6.4 3.4" /></S>,
   search: (p) => <S {...p}><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></S>,
@@ -37,7 +39,7 @@ export const Icon = {
   spark: (p) => <S {...p}><path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9 12 3.5Z" /></S>,
 }
 
-export function Sheet({ open, onClose, title, children, tall = false, footer = null, bodyRef = null }) {
+export function Sheet({ open, onClose, title, children, tall = false, footer = null, bodyRef = null, tabs = null }) {
   useEffect(() => {
     if (!open) return
     const onKey = (e) => e.key === 'Escape' && onClose?.()
@@ -59,6 +61,7 @@ export function Sheet({ open, onClose, title, children, tall = false, footer = n
             <Icon.x />
           </button>
         </div>
+        {tabs && <div className="px-5 pb-2.5 shrink-0">{tabs}</div>}
         <div ref={bodyRef} className={`overflow-y-auto no-scrollbar px-5 ${footer ? 'pb-4 flex-1 min-h-0' : 'pb-8'}`}>{children}</div>
         {footer && <div className="shrink-0 border-t border-fern/40 px-4 pt-3 pb-[max(0.9rem,env(safe-area-inset-bottom))]">{footer}</div>}
       </div>

@@ -261,7 +261,7 @@ export default function Radar() {
       {deals.length === 0 ? (
         <Empty>{t('radar.none')}</Empty>
       ) : (
-        <ul className="space-y-2.5">
+        <ul className="space-y-2.5" data-tour-el="radar-deals">
           {deals.map((d) => {
             const prod = byId(d.product)
             const st = storeById(d.store)

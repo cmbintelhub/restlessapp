@@ -2,8 +2,8 @@
 
 Protótipo funcional do app de redução de desperdício alimentar. Web app mobile first, sem backend, publicado no GitHub Pages e instalável no iPhone e no Android direto pelo navegador.
 
-**App:** https://cmbintelhub.github.io/restlessapp/
-**Página de instalação:** https://cmbintelhub.github.io/restlessapp/baixar/
+**App:** https://valentinpvlc-blip.github.io/CSMAPP/
+**Página de instalação:** https://valentinpvlc-blip.github.io/CSMAPP/baixar/
 
 ## Publicar no GitHub Pages
 
@@ -11,7 +11,7 @@ O repositório publica sozinho. A cada push na branch `main`, o workflow `.githu
 
 Configuração, feita uma vez só:
 
-1. Suba o conteúdo desta pasta para a raiz do repositório `cmbintelhub/restlessapp`, na branch `main`
+1. Suba o conteúdo desta pasta para a raiz do repositório `valentinpvlc-blip/CSMAPP`, na branch `main`
 2. No repositório, abra **Settings**, depois **Pages**
 3. Em **Build and deployment**, na opção **Source**, escolha **GitHub Actions**
 4. Abra a aba **Actions** e acompanhe o workflow "Deploy no GitHub Pages". Leva cerca de um minuto
@@ -38,7 +38,7 @@ npm test            # tudo, incluindo os testes de navegador
 
 Os testes de navegador usam Playwright e esperam o `dist` servido por um servidor estático. Para reproduzir a subpasta do GitHub Pages, sirva uma pasta que contenha `dist` copiado como `restlessapp` e rode com `BASE=http://127.0.0.1:8081/restlessapp/index.html`.
 
-Contagem da última execução: 737 verificações de lógica, 96 de nota fiscal, 209 do assistente, 54 de interface e 13 do OCR de ponta a ponta.
+Contagem da última execução: 778 verificações de lógica, 96 de nota fiscal, 209 do assistente, 37 de métricas de sucesso do cliente, 75 de interface e 13 do OCR de ponta a ponta.
 
 ## Roteiro de demonstração (5 minutos)
 
@@ -49,11 +49,11 @@ O app abre no onboarding. Se precisar voltar ao início durante a apresentação
 3. **Lista.** Abra o item Tomate e toque na embalagem de 5 kg. O app acusa "Waste risk: 400% more than your household eats in a week" e mostra quantos quilos a redução tira do lixo. Volte para 1 kg.
 4. **Despensa.** Mostre a faixa de cor por validade e o "acaba por volta de", que vem do ritmo de consumo da casa, não de uma data fixa.
 5. **Radar.** Alterne para Mapa. Os pins mostram o desconto máximo por loja. Volte para Lista, abra uma oferta, reserve e pague com Pix. O item entra na despensa e o impacto sobe.
-6. **Vizinhos.** Reivindique um excedente de um vizinho. Depois abra o ícone do frasco no topo e use "Um vizinho pega a sua doação".
-7. **Impacto.** Mostre que os quatro pilares escrevem no mesmo número, a divisão por origem e as métricas de produto do plano de negócio.
-8. **Assistente.** Toque no balão no topo. Use a sugestão "O que vence essa semana?" e mostre que a resposta lê a despensa real. Depois digite algo fora do roteiro, como "quero pedir uma pizza", e mostre a transferência para atendente.
+6. **Vizinhos.** Reivindique um excedente de um vizinho. Depois abra o ícone do frasco no topo e use "Um vizinho pega a sua doação". Mostre também as "Dicas da vizinhança" mais abaixo: publique uma dica e curta uma já existente — co-criação de conteúdo pelos próprios vizinhos, não pelo app.
+7. **Conta.** Mostre a aba dividida em duas visões: "Meu progresso", o que o cliente vê (pilares, pontos, divisão por origem), e "Account Insights", separada e claramente marcada como visão interna da equipe, com o Customer Health Score, o uso real da casa (sessões, sequência de dias, tempo até o primeiro valor, adoção dos pilares) e, marcados como simulados, os benchmarks entre usuários (DAU/WAU/MAU, coortes de retenção, NPS).
+8. **Assistente.** Toque no balão no topo. Use a sugestão "O que vence essa semana?" e mostre que a resposta lê a despensa real. Depois digite algo fora do roteiro, como "quero pedir uma pizza", e mostre a transferência para atendente. Troque para a aba "Sugestões" ao lado do chat: vote em uma ideia de outro usuário e publique a sua própria — outra frente de co-criação, desta vez sobre o próprio app.
 9. **Frasco (controles de demonstração).** "Avançar 3 dias" envelhece a despensa na frente da banca e dispara os alertas.
-10. **Idioma.** Engrenagem, Idioma, Português. A interface inteira troca.
+10. **Idioma.** Engrenagem, Idioma, Português. A interface inteira troca. Mostre também "Seu time de conta" na engrenagem: o contato do Customer Success Manager (nome, e-mail e telefone) para quando o autoatendimento e o assistente não bastam.
 
 ## Distribuir para a turma
 
@@ -68,7 +68,7 @@ Mensagem pronta para mandar no grupo:
 
 > Oi! Estamos testando uma versão inicial do restless, o app de redução de desperdício alimentar do nosso trabalho, e queremos a sua ajuda por alguns dias.
 >
-> Teste aqui: https://cmbintelhub.github.io/restlessapp/
+> Teste aqui: https://valentinpvlc-blip.github.io/CSMAPP/
 >
 > Como instalar:
 > 📱 No iPhone: abra o link no Safari, toque em Compartilhar, toque em "Adicionar à Tela de Início" e depois em Adicionar
@@ -104,11 +104,14 @@ src/
   lib/matcher.js        glossário, similaridade e classificador de sobra
   lib/ocr.js            pré-processamento em canvas, jsQR e Tesseract sob demanda
   lib/chatbot.js        motor do assistente: normalização, pontuação, fallback e fatos do app
+  lib/metrics.js        Customer Health Score, streak, tempo até o primeiro valor, adoção, churn, tendência de valor, CSQL
   data/chatbot.js       intenções do assistente em PT e EN, fixas e contextuais
   data/catalog.js       209 alimentos e bebidas
+  data/population.js    população simulada e determinística para os benchmarks entre usuários (DAU/WAU/MAU, coortes, NPS)
   components/ui.jsx     primitivos de UI e ícones
   components/HouseholdEditor.jsx   ficha por pessoa: apetite, altura, peso, IMC
-  screens/              Onboarding, Home, Planner, Radar, Community, Impact, Settings, Chat
+  components/Tour.jsx   tour guiado pós-onboarding: um destaque por pilar, na ordem escolhida, e um passo final sobre o assistente
+  screens/              Onboarding, Home, Planner, Radar, Community, Account, Settings, Chat
   App.jsx               moldura mobile, navegação, toasts, notificações, painel de demonstração
 tests/
   run.mjs               testes do motor de cálculo e de todos os caminhos do reducer
@@ -116,6 +119,7 @@ tests/
   ui.mjs                fluxo completo no navegador, com screenshots e teste de regressão
   scan.mjs              pipeline de OCR de ponta a ponta no navegador, com a foto real
   chatbot.mjs           roteamento, erros de digitação, fallback e respostas contextuais
+  metrics.mjs           Customer Health Score, métricas de uso reais e a população simulada
 .github/workflows/
   deploy.yml            testes, build e publicação no GitHub Pages a cada push na main
 ```
@@ -130,7 +134,11 @@ O IMC não é multiplicado por cima disso, porque ele é derivado das mesmas dua
 
 ### A camada de dados compartilhada
 
-Os quatro pilares leem e escrevem o mesmo objeto de estado. Reservar uma oferta no Radar coloca o alimento na despensa. Reivindicar de um vizinho também. Reduzir uma quantidade na lista credita quilos evitados. Todo evento entra no mesmo registro de impacto, que é o que a tela Impacto mostra dividido por origem.
+Os quatro pilares leem e escrevem o mesmo objeto de estado. Reservar uma oferta no Radar coloca o alimento na despensa. Reivindicar de um vizinho também. Reduzir uma quantidade na lista credita quilos evitados. Todo evento entra no mesmo registro de impacto, que é o que a aba Conta mostra dividido por origem. O Customer Health Score e as demais métricas de sucesso do cliente ficam separados, em "Account Insights" dentro da mesma aba: uma visão interna da equipe, não do cliente.
+
+### O tour guiado
+
+Assim que o onboarding termina, um tour curto abre sozinho por cima da tela inicial: um cartão de boas-vindas, depois um destaque por pilar, na mesma ordem que a pessoa acabou de definir no passo 3, entrando em cada tela real e apontando para os elementos e mensagens que ela usa no dia a dia (por exemplo, "Waste risk" na Lista ou "Already at home" no Radar), um destaque na aba Conta, que é onde os quatro pilares se encontram, e por fim um passo sobre o assistente, lembrando que ele existe para tirar dúvidas e que, quando não encontra uma resposta, transfere para o atendimento. Cada passo já troca de aba de verdade, então quem está vendo o tour está olhando para a tela real, não para uma captura de tela. Dá para pular a qualquer momento com "Skip tour", ou assistir de novo pela engrenagem, seção Protótipo, "Ver o tour de novo".
 
 ## Leitura de nota fiscal real
 

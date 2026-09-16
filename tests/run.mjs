@@ -154,6 +154,8 @@ let s = reducer(s0, { type: 'finishOnboarding' })
 check('onboarding: CPF consent fills the pantry', s.pantry.length > 0, `pantry=${s.pantry.length}`)
 check('onboarding: purchases are recorded', s.purchases.length === 2)
 check('onboarding: a capture notification is raised', s.notifications.some((n) => n.text === 'notif.capture'))
+check('usage: onboarding stamps onboardedAt', s.onboardedAt === s.clock)
+check('usage: a fresh household starts with no session yet', s0.usage.sessions === 0 && s0.onboardedAt === null)
 
 let sNo = reducer({ ...s0, household: { ...s0.household, cpf: false } }, { type: 'finishOnboarding' })
 check('onboarding: without consent the pantry stays empty', sNo.pantry.length === 0)
@@ -163,6 +165,10 @@ check('list: an item is added', s.list.length === 1 && s.list[0].product === 'to
 s = reducer(s, { type: 'addToList', product: 'tomato', qty: 1, need: 1, atHome: 0, dupText: 'dup' })
 check('list: the same product is not added twice', s.list.length === 1)
 check('list: the duplicate attempt warns the user', s.toast?.text === 'dup')
+check('usage: using the planner stamps its first-used date', s.usage.pillarFirstUsedAt.planner === s.clock)
+check('usage: an untouched pillar stays unstamped', s.usage.pillarFirstUsedAt.community === null)
+check('usage: real activity marks today as an active day', s.usage.activeDates.includes(s.clock))
+check('usage: reading prefs alone is not activity', reducer(s, { type: 'prefs', patch: {} }).usage.activeDates.length === s.usage.activeDates.length)
 
 {
   const before = s.impact.kg
@@ -170,6 +176,9 @@ check('list: the duplicate attempt warns the user', s.toast?.text === 'dup')
   const s2 = reducer(s, { type: 'listQty', uid, qty: 0.5, savedKg: 0.5, label: 'Tomatoes' })
   check('quantity: downsizing credits waste avoided', close(s2.impact.kg, before + 0.5))
   check('quantity: the credited event names the pillar', s2.impact.events[0].src === 'quantity')
+  check('usage: the first real kg saved stamps firstValueAt', before === 0 && s2.usage.firstValueAt === s2.clock)
+  const s2b = reducer(s2, { type: 'listQty', uid, qty: 0.3, savedKg: 0.2, label: 'Tomatoes' })
+  check('usage: firstValueAt does not move on later value events', s2b.usage.firstValueAt === s2.usage.firstValueAt)
   const s3 = reducer(s, { type: 'listQty', uid, qty: 2, savedKg: 0, label: 'Tomatoes' })
   check('quantity: raising the quantity credits nothing', close(s3.impact.kg, before))
   check('quantity: the new quantity is stored', s3.list[0].qty === 2)
@@ -243,6 +252,43 @@ check('list: the duplicate attempt warns the user', s.toast?.text === 'dup')
   check('claim: a post cannot be claimed twice', s3.pantry.length === s2.pantry.length)
 }
 
+/* ---- co-creation: neighbors and this household contributing tips ---- */
+{
+  check('tips: the board starts seeded with neighbor tips', s.tips.length > 0 && s.tips.every((tp) => tp.mine === false))
+  const s2 = reducer(s, { type: 'addTip', text: '  Store herbs in a glass of water like flowers.  ', pillar: 'planner' })
+  check('tips: a new tip lands on top', s2.tips[0].text === 'Store herbs in a glass of water like flowers.')
+  check('tips: a submitted tip is marked as mine, with no likes yet', s2.tips[0].mine === true && s2.tips[0].likes === 0)
+  check('tips: submitting a tip counts as using the community pillar', s2.stats.pillarsUsed.includes('community'))
+  check('tips: blank text is rejected', reducer(s, { type: 'addTip', text: '   ' }).tips.length === s.tips.length)
+  check('tips: whitespace-only text does not count as using a pillar',
+    reducer(s, { type: 'addTip', text: '' }).stats.pillarsUsed.length === s.stats.pillarsUsed.length)
+
+  const seeded = s.tips[0]
+  const liked = reducer(s, { type: 'likeTip', id: seeded.id })
+  check('tips: liking a tip increments its count', liked.tips.find((tp) => tp.id === seeded.id).likes === seeded.likes + 1)
+  check('tips: liking marks it as liked by me', liked.tips.find((tp) => tp.id === seeded.id).likedByMe === true)
+  const unliked = reducer(liked, { type: 'likeTip', id: seeded.id })
+  check('tips: liking again toggles it back off', unliked.tips.find((tp) => tp.id === seeded.id).likes === seeded.likes)
+  check('tips: an unknown id changes nothing', reducer(s, { type: 'likeTip', id: 'nope' }).tips[0].likes === s.tips[0].likes)
+}
+
+/* ---- co-creation aimed at the app itself: the in-app feature-idea board ---- */
+{
+  check('ideas: the board starts seeded with other users\' ideas', s.ideas.length > 0 && s.ideas.every((it) => it.mine === false))
+  const s2 = reducer(s, { type: 'addIdea', text: '  Dark mode for the whole app.  ' })
+  check('ideas: a new idea lands on top', s2.ideas[0].text === 'Dark mode for the whole app.')
+  check('ideas: a submitted idea is marked as mine, with no votes yet', s2.ideas[0].mine === true && s2.ideas[0].votes === 0)
+  check('ideas: blank text is rejected', reducer(s, { type: 'addIdea', text: '   ' }).ideas.length === s.ideas.length)
+
+  const seeded = s.ideas[0]
+  const voted = reducer(s, { type: 'voteIdea', id: seeded.id })
+  check('ideas: voting increments its count', voted.ideas.find((it) => it.id === seeded.id).votes === seeded.votes + 1)
+  check('ideas: voting marks it as voted by me', voted.ideas.find((it) => it.id === seeded.id).votedByMe === true)
+  const unvoted = reducer(voted, { type: 'voteIdea', id: seeded.id })
+  check('ideas: voting again toggles it back off', unvoted.ideas.find((it) => it.id === seeded.id).votes === seeded.votes)
+  check('ideas: an unknown id changes nothing', reducer(s, { type: 'voteIdea', id: 'nope' }).ideas[0].votes === s.ideas[0].votes)
+}
+
 {
   const s2 = reducer(s, { type: 'pantryUse', uid: s.pantry[0].uid, label: 'x' })
   check('pantry: using food in time credits waste avoided', s2.impact.kg > s.impact.kg)
@@ -274,6 +320,26 @@ check('list: the duplicate attempt warns the user', s.toast?.text === 'dup')
   const s2 = reducer({ ...s, lang: 'pt' }, { type: 'reset' })
   check('reset: everything clears', s2.onboarded === false && s2.pantry.length === 0 && s2.impact.kg === 0)
   check('reset: the chosen language survives', s2.lang === 'pt')
+  check('reset: usage history clears too', s2.usage.sessions === 0 && s2.usage.activeDates.length === 0)
+  check('reset: the tips board goes back to the seeded neighbor tips',
+    s2.tips.length === initialState().tips.length && s2.tips.every((tp) => tp.mine === false))
+  check('reset: the idea board goes back to the seeded ideas',
+    s2.ideas.length === initialState().ideas.length && s2.ideas.every((it) => it.mine === false))
+}
+
+/* ---- account/usage metrics: session count, NPS pulse ---- */
+{
+  const s2 = reducer(s, { type: 'session' })
+  check('session: opening the app counts a session', s2.usage.sessions === s.usage.sessions + 1)
+  const s3 = reducer(s2, { type: 'session' })
+  check('session: each open counts separately', s3.usage.sessions === s.usage.sessions + 2)
+  check('session: opening alone is not "activity" for the streak', s3.usage.activeDates.length === s.usage.activeDates.length)
+
+  check('nps: unanswered by default', s0.nps === null)
+  const withNps = reducer(s, { type: 'submitNps', score: 9 })
+  check('nps: records the score and the clock date', withNps.nps.score === 9 && withNps.nps.ts === withNps.clock)
+  const changedMind = reducer(withNps, { type: 'submitNps', score: 4 })
+  check('nps: answering again overwrites the previous score', changedMind.nps.score === 4)
 }
 
 /* ---- migration from the v1 household ---- */
@@ -294,6 +360,21 @@ check('list: the duplicate attempt warns the user', s.toast?.text === 'dup')
   const v2 = migrate({ ...initialState(), v: 2, learnedEans: { '7894900027013': 'cola' } })
   check('migration: v2 ganha o mapa de EANs sem perder nada',
     v2.v === initialState().v && v2.learnedEans['7894900027013'] === 'cola')
+  const { usage: _u, onboardedAt: _oa, nps: _n, ...preV4 } = initialState()
+  const v3 = migrate({ ...preV4, v: 3, onboarded: true, impact: { kg: 4, money: 10, points: 5, credit: 0, events: [] } })
+  check('migration: v3 bumps straight to current without wiping real state',
+    v3.v === initialState().v && v3.onboarded === true && v3.impact.kg === 4)
+  check('migration: v3 has no usage field yet (backfilled by load(), not migrate())', v3.usage === undefined)
+  const { tips: _tp, ...preV5 } = initialState()
+  const v4 = migrate({ ...preV5, v: 4, impact: { kg: 2, money: 5, points: 3, credit: 0, events: [] } })
+  check('migration: v4 bumps straight to current without wiping real state',
+    v4.v === initialState().v && v4.impact.kg === 2)
+  check('migration: v4 has no tips field yet (backfilled by load(), not migrate())', v4.tips === undefined)
+  const { ideas: _id, ...preV6 } = initialState()
+  const v5 = migrate({ ...preV6, v: 5, impact: { kg: 1, money: 2, points: 1, credit: 0, events: [] } })
+  check('migration: v5 bumps straight to current without wiping real state',
+    v5.v === initialState().v && v5.impact.kg === 1)
+  check('migration: v5 has no ideas field yet (backfilled by load(), not migrate())', v5.ideas === undefined)
   check('migration: o estado corrente e deixado em paz',
     migrate({ ...initialState() }).v === initialState().v)
   check('migration: an unknown version is rejected', migrate({ v: 99 }) === null)

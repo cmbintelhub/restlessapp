@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp, useDerived } from './store.jsx'
 import { Icon, Sheet, Empty } from './components/ui.jsx'
 import { shortDate } from './lib/logic.js'
+import Tour, { buildTourSteps } from './components/Tour.jsx'
 import Onboarding from './screens/Onboarding.jsx'
 import Home from './screens/Home.jsx'
 import Planner from './screens/Planner.jsx'
 import Radar from './screens/Radar.jsx'
 import Community from './screens/Community.jsx'
-import Impact from './screens/Impact.jsx'
+import Account from './screens/Account.jsx'
 import Settings from './screens/Settings.jsx'
 import Chat from './screens/Chat.jsx'
 
@@ -117,15 +118,21 @@ function SimPanel({ open, onClose }) {
  * Declared at module scope on purpose: a component defined inside App would be a new
  * type on every render, remounting the whole tree and wiping each screen's local state.
  */
-function Frame({ children }) {
+function Frame({ children, innerRef }) {
   return (
     <div className="h-full w-full bg-[#070B08] flex items-center justify-center sm:p-6">
-      <div className="relative w-full max-w-[430px] h-full sm:h-[min(100%,900px)] bg-ink overflow-hidden sm:rounded-[32px] sm:border sm:border-fern/40 sm:shadow-2xl sm:shadow-black flex flex-col">
+      <div
+        ref={innerRef}
+        className="relative w-full max-w-[430px] h-full sm:h-[min(100%,900px)] bg-ink overflow-hidden sm:rounded-[32px] sm:border sm:border-fern/40 sm:shadow-2xl sm:shadow-black flex flex-col"
+      >
         {children}
       </div>
     </div>
   )
 }
+
+/** Maps a pillar id to the tab that best shows it off; the quantity engine lives inside the Planner. */
+const tabForPillar = (p) => (p === 'quantity' ? 'planner' : p)
 
 export default function App() {
   const { state, dispatch, t } = useApp()
@@ -136,44 +143,83 @@ export default function App() {
   const [setOpen, setSetOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [chat, setChat] = useState([])
+  const [tourStep, setTourStep] = useState(null)
+  const shellRef = useRef(null)
+  const wasOnboarded = useRef(state.onboarded)
+  const touring = tourStep !== null
+
+  const tourSteps = useMemo(
+    () => buildTourSteps(state.prefs.ranking, tabForPillar),
+    [state.prefs.ranking],
+  )
+  const spotlightChat = touring && tourSteps[tourStep]?.target === 'header-chat'
 
   const go = (id) => { setTab(id); }
+
+  const startTour = () => { setTab('home'); setTourStep(0) }
+  const nextTourStep = () => {
+    const step = tourSteps[tourStep + 1]
+    if (!step) { setTourStep(null); return }
+    setTourStep(tourStep + 1)
+  }
+  const endTour = () => { setTourStep(null); setTab('home') }
 
   useEffect(() => {
     document.documentElement.lang = state.lang
   }, [state.lang])
+
+  // One real, coarse "app opened" count per mount — feeds the Account tab's usage metrics.
+  useEffect(() => { dispatch({ type: 'session' }) }, [])
 
   // Reiniciar o protótipo também começa uma conversa nova com o assistente.
   useEffect(() => {
     if (!state.onboarded) { setChat([]); setChatOpen(false) }
   }, [state.onboarded])
 
+  // A guided tour of the pillars starts automatically the moment onboarding finishes.
+  useEffect(() => {
+    if (!wasOnboarded.current && state.onboarded) startTour()
+    wasOnboarded.current = state.onboarded
+  }, [state.onboarded])
+
+  // Each tour step shows the real screen it talks about, not a mockup of it.
+  useEffect(() => {
+    if (tourStep === null) return
+    const step = tourSteps[tourStep]
+    if (step?.tab) setTab(step.tab)
+  }, [tourStep])
+
   if (!state.onboarded) {
     return <Frame><Onboarding /></Frame>
   }
 
   return (
-    <Frame>
+    <Frame innerRef={shellRef}>
       <Toast />
 
-      <header className="shrink-0 flex items-center gap-2 px-5 pt-5 pb-1">
+      <header className={`shrink-0 flex items-center gap-2 px-5 pt-5 pb-1 ${touring ? `pointer-events-none ${spotlightChat ? '' : 'opacity-40'}` : ''}`}>
         <span className="text-sage"><Icon.leaf size={19} /></span>
         <span className="font-display text-[17px] tracking-tight flex-1">{t('app.name')}</span>
-        <button className="p-2 text-haze active:text-sage" onClick={() => setChatOpen(true)} aria-label={t('chat.open')}>
+        <button
+          data-tour-el="header-chat"
+          className="p-2 text-haze active:text-sage"
+          onClick={() => setChatOpen(true)}
+          aria-label={t('chat.open')}
+        >
           <Icon.chat size={19} />
         </button>
-        <button className="p-2 text-haze active:text-sage" onClick={() => setSimOpen(true)} aria-label={t('sim.title')}>
+        <button className={`p-2 text-haze active:text-sage ${spotlightChat ? 'opacity-30' : ''}`} onClick={() => setSimOpen(true)} aria-label={t('sim.title')}>
           <Icon.flask size={19} />
         </button>
         <button
-          className="p-2 text-haze active:text-sage relative"
+          className={`p-2 text-haze active:text-sage relative ${spotlightChat ? 'opacity-30' : ''}`}
           onClick={() => { setNotifOpen(true); dispatch({ type: 'readNotifications' }) }}
           aria-label={t('common.notifications')}
         >
           <Icon.bell size={19} />
           {unread > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber" />}
         </button>
-        <button className="p-2 -mr-2 text-haze active:text-sage" onClick={() => setSetOpen(true)} aria-label={t('common.settings')}>
+        <button className={`p-2 -mr-2 text-haze active:text-sage ${spotlightChat ? 'opacity-30' : ''}`} onClick={() => setSetOpen(true)} aria-label={t('common.settings')}>
           <Icon.cog size={19} />
         </button>
       </header>
@@ -183,10 +229,10 @@ export default function App() {
         {tab === 'planner' && <Planner go={go} />}
         {tab === 'radar' && <Radar />}
         {tab === 'community' && <Community />}
-        {tab === 'impact' && <Impact />}
+        {tab === 'impact' && <Account />}
       </main>
 
-      <nav className="shrink-0 border-t border-fern/40 bg-bark/95 backdrop-blur px-2 pt-2 pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+      <nav className={`shrink-0 border-t border-fern/40 bg-bark/95 backdrop-blur px-2 pt-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] ${touring ? 'pointer-events-none' : ''}`}>
         <ul className="flex">
           {TABS.map((tb) => {
             const IconEl = tb.icon
@@ -194,8 +240,9 @@ export default function App() {
             return (
               <li key={tb.id} className="flex-1">
                 <button
+                  data-tour-nav={tb.id}
                   onClick={() => setTab(tb.id)}
-                  className={`w-full flex flex-col items-center gap-1 py-1.5 rounded-xl ${on ? 'text-sage' : 'text-haze/70'}`}
+                  className={`w-full flex flex-col items-center gap-1 py-1.5 rounded-xl ${on ? 'text-sage' : 'text-haze/70'} ${touring && tab !== tb.id ? 'opacity-30' : ''}`}
                   aria-current={on ? 'page' : undefined}
                 >
                   <IconEl size={21} />
@@ -209,8 +256,19 @@ export default function App() {
 
       <Notifications open={notifOpen} onClose={() => setNotifOpen(false)} />
       <SimPanel open={simOpen} onClose={() => setSimOpen(false)} />
-      <Settings open={setOpen} onClose={() => setSetOpen(false)} />
+      <Settings open={setOpen} onClose={() => setSetOpen(false)} onReplayTour={startTour} />
       <Chat open={chatOpen} onClose={() => setChatOpen(false)} messages={chat} setMessages={setChat} />
+
+      {touring && (
+        <Tour
+          steps={tourSteps}
+          index={tourStep}
+          containerRef={shellRef}
+          onNext={nextTourStep}
+          onSkip={endTour}
+          t={t}
+        />
+      )}
     </Frame>
   )
 }

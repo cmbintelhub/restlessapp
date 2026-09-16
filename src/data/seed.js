@@ -58,6 +58,37 @@ export const COMMUNITY_SEED = [
   { id: 'c5', product: 'zucchini',  qty: 0.8, neighbor: 'n4', postedAgo: 2, expiresIn: 3, note: 'Travelling tomorrow' },
 ]
 
+// Co-creation: neighbors contributing their own tips instead of only consuming the
+// app's content. Seeded so the board isn't empty on first launch; pillar tags which
+// part of restless the tip is about. postedAgo is in days before the prototype clock.
+export const TIP_SEED = [
+  { id: 't1', neighbor: 'n3', pillar: 'quantity', postedAgo: 4, likes: 6,
+    text: 'Freeze ripe bananas in slices — great for smoothies later instead of tossing them.' },
+  { id: 't2', neighbor: 'n1', pillar: 'radar', postedAgo: 2, likes: 3,
+    text: 'Feira da Praça Calixto marks bread down after 12pm on Saturdays.' },
+  { id: 't3', neighbor: 'n5', pillar: 'planner', postedAgo: 6, likes: 9,
+    text: 'Bread lasts almost twice as long in the fridge during humid weeks.' },
+  { id: 't4', neighbor: 'n4', pillar: 'community', postedAgo: 1, likes: 2,
+    text: 'Post surplus in the morning — most pickups happen before lunch.' },
+]
+
+// Co-creation, aimed at the app itself instead of the neighborhood: a lightweight
+// feature-idea board living inside the assistant sheet. Seeded with the kind of
+// requests other restless users would plausibly ask for, so voting has something
+// real to act on from the first launch. postedAgo is in days before the prototype clock.
+export const IDEA_SEED = [
+  { id: 'idea1', neighbor: 'n3', postedAgo: 5, votes: 14,
+    text: 'A weekly "zero-waste" challenge with a badge for a full week without anything expiring.' },
+  { id: 'idea2', neighbor: 'n1', postedAgo: 3, votes: 11,
+    text: 'Recipe ideas using whatever is about to expire in my pantry.' },
+  { id: 'idea3', neighbor: 'n4', postedAgo: 7, votes: 9,
+    text: 'Show CO2 avoided too, not just kg and money — makes the impact feel bigger.' },
+  { id: 'idea4', neighbor: 'n2', postedAgo: 2, votes: 6,
+    text: 'A leaderboard for who saved the most kg in the building this week.' },
+  { id: 'idea5', neighbor: 'n5', postedAgo: 8, votes: 4,
+    text: 'Send deal alerts on WhatsApp too, not just push notifications.' },
+]
+
 // Receipts stand in for CPF na nota, receipt photos and linked delivery orders.
 export const RECEIPTS = [
   {

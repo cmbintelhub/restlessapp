@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useApp } from '../store.jsx'
-import { NEIGHBORS, byId } from '../data/seed.js'
+import { NEIGHBORS, PILLARS, byId } from '../data/seed.js'
 import { daysBetween, relativeWhen, qty as fmtQty, kgOf } from '../lib/logic.js'
 import { Icon, Sheet, Chip, Empty, Toggle, SectionTitle } from '../components/ui.jsx'
 
@@ -53,6 +53,8 @@ function ShareSheet({ open, onClose }) {
 export default function Community() {
   const { state, dispatch, t } = useApp()
   const [share, setShare] = useState(false)
+  const [tipText, setTipText] = useState('')
+  const [tipPillar, setTipPillar] = useState(null)
   const lang = state.lang
   const p = state.prefs
 
@@ -60,6 +62,11 @@ export default function Community() {
     if ((a.status === 'open') !== (b.status === 'open')) return a.status === 'open' ? -1 : 1
     return new Date(b.postedOn) - new Date(a.postedOn)
   })
+
+  // Co-creation: neighbors (and this household) contributing their own tips.
+  // Newest first, like a feed, so a fresh contribution is seen right away instead
+  // of starting buried under tips that have had longer to collect likes.
+  const tips = [...state.tips].sort((a, b) => new Date(b.postedOn) - new Date(a.postedOn))
 
   return (
     <div className="px-5 pt-5 pb-8">
@@ -89,7 +96,7 @@ export default function Community() {
       {posts.length === 0 ? (
         <Empty>{t('common.empty')}</Empty>
       ) : (
-        <ul className="space-y-2.5">
+        <ul className="space-y-2.5" data-tour-el="comm-board">
           {posts.map((c) => {
             const prod = byId(c.product)
             const name = prod[lang] || prod.en
@@ -143,6 +150,70 @@ export default function Community() {
           })}
         </ul>
       )}
+
+      {/* Co-creation (Brodie FP1): neighbors contribute their own tips instead of only
+          consuming what the app posts — real local state, no backend needed. */}
+      <div className="mt-7">
+        <SectionTitle>{t('comm.tips.title')}</SectionTitle>
+        <p className="text-[12.5px] text-haze -mt-2 mb-3 max-w-[38ch]">{t('comm.tips.subtitle')}</p>
+
+        <div className="card px-4 py-4 mb-3">
+          <textarea
+            value={tipText}
+            onChange={(e) => setTipText(e.target.value)}
+            placeholder={t('comm.tips.placeholder')}
+            rows={2}
+            className="w-full bg-transparent text-[14px] placeholder:text-haze/70 resize-none outline-none"
+          />
+          <div className="flex gap-1.5 flex-wrap mt-2.5 mb-3.5">
+            {[null, ...PILLARS].map((pl) => (
+              <Chip key={pl || 'none'} active={tipPillar === pl} onClick={() => setTipPillar(pl)}>
+                {pl ? t(`pillar.${pl}.short`) : t('comm.tips.pillar.none')}
+              </Chip>
+            ))}
+          </div>
+          <button
+            className="btn-primary w-full py-2.5 text-[13.5px] disabled:opacity-35"
+            disabled={!tipText.trim()}
+            onClick={() => {
+              dispatch({ type: 'addTip', text: tipText, pillar: tipPillar })
+              setTipText('')
+              setTipPillar(null)
+            }}
+          >
+            {t('comm.tips.submit')}
+          </button>
+        </div>
+
+        {tips.length === 0 ? (
+          <Empty>{t('comm.tips.empty')}</Empty>
+        ) : (
+          <ul className="space-y-2.5" data-tour-el="comm-tips">
+            {tips.map((tp) => {
+              const n = tp.mine ? null : neighborById(tp.neighbor)
+              const who = tp.mine ? t('comm.tips.mine') : (n?.name || '')
+              const ago = daysBetween(state.clock, tp.postedOn)
+              return (
+                <li key={tp.id} className="card px-4 py-3.5">
+                  <p className="text-[12px] text-haze">
+                    {who}
+                    {tp.pillar && <> · {t(`pillar.${tp.pillar}.short`)}</>}
+                    {' · '}{relativeWhen(ago, t)}
+                  </p>
+                  <p className="text-[14px] leading-snug mt-1">{tp.text}</p>
+                  <button
+                    className={`mt-2.5 flex items-center gap-1.5 text-[12.5px] ${tp.likedByMe ? 'text-amber' : 'text-haze'}`}
+                    onClick={() => dispatch({ type: 'likeTip', id: tp.id })}
+                  >
+                    <Icon.heart size={15} fill={tp.likedByMe ? 'currentColor' : 'none'} />
+                    {tp.likes}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
 
       <ShareSheet open={share} onClose={() => setShare(false)} />
     </div>

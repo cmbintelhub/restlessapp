@@ -4,7 +4,7 @@ import { Icon, Sheet, Chip, Toggle, Field, SectionTitle } from '../components/ui
 import HouseholdEditor from '../components/HouseholdEditor.jsx'
 import { RankList } from './Onboarding.jsx'
 
-export default function Settings({ open, onClose }) {
+export default function Settings({ open, onClose, onReplayTour }) {
   const { state, dispatch, t } = useApp()
   const [confirmReset, setConfirmReset] = useState(false)
   const h = state.household
@@ -71,7 +71,34 @@ export default function Settings({ open, onClose }) {
         <Toggle on={h.cpf} onChange={(v) => setH({ cpf: v })} label={t('set.cpf')} />
       </div>
 
+      <SectionTitle>{t('set.support')}</SectionTitle>
+      <div className="card px-4 py-4 mb-6 flex items-center gap-3.5">
+        <span className="w-11 h-11 rounded-full bg-moss grid place-items-center shrink-0 text-[14px] font-semibold text-sage">
+          MG
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] leading-tight">Malkam Goytom</p>
+          <p className="text-[12.5px] text-haze mt-0.5">{t('set.support.role')}</p>
+          <div className="flex flex-col gap-1 mt-2 text-[13px]">
+            <a href="mailto:halbermann@restless.com" className="text-sage underline underline-offset-2 truncate">
+              halbermann@restless.com
+            </a>
+            <a href="tel:+5511926451819" className="text-sage underline underline-offset-2 num">
+              +55 11 92645-1819
+            </a>
+          </div>
+        </div>
+      </div>
+
       <SectionTitle>{t('set.demo')}</SectionTitle>
+      {onReplayTour && (
+        <button
+          className="btn-ghost w-full py-2.5 text-[14px] mb-3"
+          onClick={() => { onClose(); onReplayTour() }}
+        >
+          {t('onb.tour.replay')}
+        </button>
+      )}
       <div className="card px-4 py-4">
         <p className="text-[13px] text-haze leading-snug mb-3">{t('set.resetHint')}</p>
         {!confirmReset ? (
